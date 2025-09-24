@@ -278,7 +278,7 @@ class StreamlitApp:
                         pass
 
     def render_chat_interface(self):
-        """Render the chat interface for RAG Q&A."""
+        """Render the chat interface for RAG Q&A with improved memory handling."""
         # Display chat history
         chat_container = st.container()
 
@@ -293,7 +293,7 @@ class StreamlitApp:
         user_question = st.chat_input("Ask a question about the document...")
 
         if user_question:
-            # Add user message to chat
+            # Add user message to chat immediately
             with st.chat_message("user"):
                 st.write(user_question)
 
@@ -301,20 +301,87 @@ class StreamlitApp:
             with st.chat_message("assistant"):
                 with st.spinner("🤔 Thinking..."):
                     try:
-                        result = st.session_state.rag_pipeline.query(user_question)
-                        answer = result["answer"]
+                        # IMPORTANT: Clear any stale memory state before query
+                        # This prevents the delayed response issue
+
+                        # Method 1: Use a fresh query without relying on internal memory
+                        # Get current context directly from vectorstore
+                        if hasattr(st.session_state.rag_pipeline, 'vectorstore'):
+                            # Retrieve relevant documents
+                            retriever = st.session_state.rag_pipeline.vectorstore.as_retriever(
+                                search_type="similarity",
+                                search_kwargs={"k": 5}
+                            )
+                            relevant_docs = retriever.get_relevant_documents(user_question)
+
+                            # Format context
+                            context = "\n\n".join([doc.page_content for doc in relevant_docs])
+
+                            # Format chat history for context
+                            chat_history_str = ""
+                            if st.session_state.chat_history:
+                                recent_history = st.session_state.chat_history[-3:]  # Last 3 exchanges
+                                for q, a in recent_history:
+                                    chat_history_str += f"Human: {q}\nAssistant: {a}\n\n"
+
+                            # Create prompt manually to avoid memory sync issues
+                            full_prompt = f"""You are an intelligent document assistant. Your primary role is to help users understand and extract information from uploaded documents, while also being able to engage in natural conversation.
+
+    Instructions for responding:
+
+    1. CONVERSATIONAL INTERACTIONS (greetings, small talk, general chat):
+       - If the user is greeting you, making small talk, or having casual conversation that doesn't require document analysis, respond naturally and conversationally
+       - Be helpful and friendly without mentioning the uploaded documents
+       - Examples: "Hello", "How are you?", "Thank you", "What can you do?", etc.
+
+    2. DOCUMENT-RELATED QUESTIONS (queries about content, analysis, specific information):
+       - First, carefully examine the provided context from the uploaded document
+       - If the answer is clearly found in the context, provide a comprehensive response based on that information
+       - Reference the document naturally (e.g., "According to the document...", "The text indicates...", "Based on the uploaded content...")
+
+    3. OUT-OF-SCOPE QUESTIONS (information not in the document):
+       - If the question is document-related but the answer is not available in the provided context, respond with:
+       "This information is not available in the provided document. However, based on my general knowledge: [provide helpful general information]"
+       - Be clear about what comes from the document vs. your general knowledge
+
+    Context from uploaded document:
+    {context}
+
+    Previous conversation:
+    {chat_history_str}
+
+    Current question: {user_question}
+
+    Response:"""
+
+                            # Get response from LLM directly
+                            response = st.session_state.rag_pipeline.llm.invoke(full_prompt)
+                            answer = response.content if hasattr(response, 'content') else str(response)
+
+                            # Update the RAG pipeline memory manually to keep it in sync
+                            if hasattr(st.session_state.rag_pipeline,
+                                       'memory') and st.session_state.rag_pipeline.memory:
+                                st.session_state.rag_pipeline.memory.save_context(
+                                    {"question": user_question},
+                                    {"answer": answer}
+                                )
+
+                        else:
+                            # Fallback to original method
+                            result = st.session_state.rag_pipeline.query(user_question)
+                            answer = result["answer"]
 
                         st.write(answer)
 
-                        # Show source info if available
-                        if result.get("source_documents"):
-                            st.caption(f"📚 Based on {len(result['source_documents'])} relevant document sections")
+                        # Show source info if we have relevant docs
+                        if 'relevant_docs' in locals() and relevant_docs:
+                            st.caption(f"📚 Based on {len(relevant_docs)} relevant document sections")
 
                     except Exception as e:
                         answer = f"Sorry, I encountered an error: {e}"
                         st.error(answer)
 
-            # Add to chat history
+            # Add to chat history AFTER getting the response
             st.session_state.chat_history.append((user_question, answer))
 
     def render_report_page(self):
