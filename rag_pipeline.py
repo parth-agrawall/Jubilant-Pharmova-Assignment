@@ -44,17 +44,14 @@ except ImportError as e:
 class RAGPipeline:
     """Complete RAG Pipeline with conversational memory."""
 
-    def __init__(self, gemini_api_key: str = "AIzaSyD3R_-41HkKljnZgeI0_QXz5bdymMMsBbs",
-                 hf_token: str = "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"):
+    def __init__(self, gemini_api_key: str = "AIzaSyD3R_-41HkKljnZgeI0_QXz5bdymMMsBbs"):
         """
         Initialize the RAG pipeline.
 
         Args:
             gemini_api_key: Google API key for Gemini
-            hf_token: Hugging Face token for embeddings
         """
         self.gemini_api_key = gemini_api_key
-        self.hf_token = hf_token
         self.embeddings = None
         self.vectorstore = None
         self.llm = None
@@ -65,33 +62,15 @@ class RAGPipeline:
         """Initialize HuggingFace embeddings."""
         logger.info("Setting up HuggingFace embeddings...")
         try:
-            # Use hardcoded HF token
-            model_kwargs = {
-                'device': 'cpu',
-                'use_auth_token': self.hf_token
-            }
-
-            logger.info("Using hardcoded Hugging Face authentication token")
-
             self.embeddings = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-MiniLM-L6-v2",
-                model_kwargs=model_kwargs,
+                model_kwargs={'device': 'cpu'},
                 encode_kwargs={'normalize_embeddings': True}
             )
             logger.info("✓ Embeddings initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize embeddings: {e}")
-            if "authentication" in str(e).lower() or "token" in str(e).lower():
-                logger.error("Authentication error with HF token. Trying without token...")
-                # Fallback without token
-                self.embeddings = HuggingFaceEmbeddings(
-                    model_name="sentence-transformers/all-MiniLM-L6-v2",
-                    model_kwargs={'device': 'cpu'},
-                    encode_kwargs={'normalize_embeddings': True}
-                )
-                logger.info("✓ Embeddings initialized without token")
-            else:
-                raise
+            raise
 
     def load_and_process_text(self, text_content: str) -> List[Document]:
         """Load and split text content into documents."""
@@ -190,13 +169,15 @@ class RAGPipeline:
         logger.info("Creating QA chain with retrieval...")
 
         # Custom prompt template
-        prompt_template = """Use the following context to answer the question. If you don't know the answer based on the context, say so clearly.
+        prompt_template = """You are a research assistant. Use the following context to answer the question.
+If the answer cannot be found in the context, simply reply: "I don't know based on the provided documents."
+Do not try to make up an answer.
 
 Context: {context}
 
 Question: {question}
 
-Provide a comprehensive and accurate answer based on the context:"""
+Answer:"""
 
         prompt = PromptTemplate(
             template=prompt_template,
@@ -266,7 +247,7 @@ Provide a comprehensive and accurate answer based on the context:"""
             raise RuntimeError("Pipeline not initialized. Call initialize_pipeline() first.")
 
         try:
-            result = self.qa_chain({"question": question})
+            result = self.qa_chain.invoke({"question": question})
             return result
         except Exception as e:
             logger.error(f"Query failed: {e}")
