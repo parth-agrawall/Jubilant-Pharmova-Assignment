@@ -165,23 +165,42 @@ class RAGPipeline:
         logger.info("✓ Memory initialized successfully")
 
     def create_qa_chain(self) -> None:
-        """Create the conversational retrieval chain."""
+        """Create the conversational retrieval chain with improved prompt."""
         logger.info("Creating QA chain with retrieval...")
 
-        # Custom prompt template
-        prompt_template = """You are a research assistant. Use the following context to answer the question.
-If the answer cannot be found in the context, simply reply: "I don't know based on the provided documents."
-Do not try to make up an answer.
+        # Improved prompt template with better logic flow
+        prompt_template = """You are an intelligent document assistant. Your primary role is to help users understand and extract information from uploaded documents, while also being able to engage in natural conversation.
 
-Context: {context}
+    Instructions for responding:
 
-Question: {question}
+    1. CONVERSATIONAL INTERACTIONS (greetings, small talk, general chat):
+       - If the user is greeting you, making small talk, or having casual conversation that doesn't require document analysis, respond naturally and conversationally
+       - Be helpful and friendly without mentioning the uploaded documents
+       - Examples: "Hello", "How are you?", "Thank you", "What can you do?", etc.
 
-Answer:"""
+    2. DOCUMENT-RELATED QUESTIONS (queries about content, analysis, specific information):
+       - First, carefully examine the provided context from the uploaded document
+       - If the answer is found in the context, provide a comprehensive response based on that information
+       - Reference the document naturally (e.g., "According to the document...", "The text indicates...", "Based on the uploaded content...")
+
+    3. OUT-OF-SCOPE QUESTIONS (information not in the document):
+       - If the question is document-related but the answer is not available in the provided context, respond with:
+       "This information is not available in the provided document. However, based on my general knowledge: [provide helpful general information]"
+       - Be clear about what comes from the document vs. your general knowledge
+
+    Context from uploaded document:
+    {context}
+
+    Previous conversation:
+    {chat_history}
+
+    Current question: {question}
+
+    Response:"""
 
         prompt = PromptTemplate(
             template=prompt_template,
-            input_variables=["context", "question"]
+            input_variables=["context", "question", "chat_history"]
         )
 
         try:
@@ -196,7 +215,7 @@ Answer:"""
                 verbose=False,
                 combine_docs_chain_kwargs={"prompt": prompt}
             )
-            logger.info("✓ QA chain created successfully")
+            logger.info("✅ QA chain created successfully")
         except Exception as e:
             logger.error(f"Failed to create QA chain: {e}")
             raise
