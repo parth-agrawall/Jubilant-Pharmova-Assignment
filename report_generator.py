@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-Bibliometric Report Generator Module
-===================================
-
-This module generates bibliometric reports from academic papers using Gemini 2.5 Flash.
-Contains its own PDF loading functionality separate from document extraction.
-"""
-
 import os
 import json
 import io
@@ -22,31 +14,12 @@ except ImportError as e:
 
 
 class BibliometricReportGenerator:
-    """
-    A class to generate bibliometric reports from academic papers using Gemini 2.5 Flash
-    """
-
     def __init__(self, api_key: str = "AIzaSyD3R_-41HkKljnZgeI0_QXz5bdymMMsBbs"):
-        """
-        Initialize the report generator with Gemini API key
-
-        Args:
-            api_key (str): Google AI API key for Gemini
-        """
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.5-flash')
         self.api_key = api_key
 
     def extract_text_from_pdf_file(self, pdf_path: str) -> str:
-        """
-        Extract text content from PDF file
-
-        Args:
-            pdf_path (str): Path to PDF file
-
-        Returns:
-            str: Extracted text content
-        """
         try:
             with open(pdf_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
@@ -59,15 +32,6 @@ class BibliometricReportGenerator:
             return ""
 
     def extract_text_from_pdf_bytes(self, pdf_content: bytes) -> str:
-        """
-        Extract text content from PDF bytes
-
-        Args:
-            pdf_content (bytes): PDF file content as bytes
-
-        Returns:
-            str: Extracted text content
-        """
         try:
             pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
             text = ""
@@ -79,15 +43,6 @@ class BibliometricReportGenerator:
             return ""
 
     def analyze_document(self, document_text: str) -> Dict:
-        """
-        Analyze the document and extract key bibliometric data
-
-        Args:
-            document_text (str): Text content of the document
-
-        Returns:
-            Dict: Structured data extracted from the document
-        """
         analysis_prompt = """
         Analyze this bibliometric/research document and extract the following structured information in JSON format:
 
@@ -105,11 +60,10 @@ class BibliometricReportGenerator:
         Provide the response as a valid JSON object with clear structure.
 
         Document text:
-        """ + document_text[:15000]  # Limit text to avoid token limits
+        """ + document_text[:15000]
 
         try:
             response = self.model.generate_content(analysis_prompt)
-            # Clean response to extract JSON
             response_text = response.text.strip()
             if response_text.startswith('```json'):
                 response_text = response_text[7:-3]
@@ -122,20 +76,9 @@ class BibliometricReportGenerator:
             return {}
 
     def generate_report_html(self, analysis_data: Dict, report_title: str = None) -> str:
-        """
-        Generate HTML report from analyzed data
-
-        Args:
-            analysis_data (Dict): Structured data from document analysis
-            report_title (str): Custom title for the report
-
-        Returns:
-            str: HTML content for the report
-        """
         if not report_title:
             report_title = analysis_data.get('title', 'Bibliometric Analysis Report')
 
-        # Generate HTML using Gemini
         html_prompt = f"""
         Create a beautiful, professional HTML report based on this bibliometric analysis data.
 
@@ -166,9 +109,6 @@ class BibliometricReportGenerator:
             return self._fallback_html(analysis_data, report_title)
 
     def _fallback_html(self, data: Dict, title: str) -> str:
-        """
-        Fallback HTML template if AI generation fails
-        """
         return f"""
         <!DOCTYPE html>
         <html lang="en">
@@ -270,14 +210,12 @@ class BibliometricReportGenerator:
                         <h2>Executive Summary</h2>
                         <p>This report presents a comprehensive bibliometric analysis based on the provided research document.</p>
                     </div>
-
                     <div class="section">
                         <h2>Analysis Results</h2>
                         <div class="data-container">
                             <div class="json-data">{json.dumps(data, indent=2)}</div>
                         </div>
                     </div>
-
                     <div class="section">
                         <h2>Key Insights</h2>
                         <div class="stats-grid">
@@ -298,37 +236,27 @@ class BibliometricReportGenerator:
         """
 
     def generate_report_from_file(self, pdf_path: str, output_path: str = None, report_title: str = None) -> str:
-        """
-        Complete workflow to generate a bibliometric report from PDF file
-
-        Args:
-            pdf_path (str): Path to PDF file
-            output_path (str): Path to save HTML report
-            report_title (str): Custom title for the report
-
-        Returns:
-            str: Path to generated HTML report
-        """
         print("Extracting text from PDF document...")
         document_text = self.extract_text_from_pdf_file(pdf_path)
 
         if not document_text:
             raise ValueError("Could not extract text from document")
-
         print("Analyzing document with Gemini...")
+
         analysis_data = self.analyze_document(document_text)
+
 
         if not analysis_data:
             raise ValueError("Could not analyze document")
-
         print("Generating HTML report...")
+
+
         if not report_title:
             filename = os.path.basename(pdf_path).replace('.pdf', '')
             report_title = f"Analysis of {filename}"
 
         html_content = self.generate_report_html(analysis_data, report_title)
 
-        # Save report
         if not output_path:
             output_path = f"{os.path.basename(pdf_path).replace('.pdf', '')}_report.html"
 
@@ -336,23 +264,13 @@ class BibliometricReportGenerator:
             f.write(html_content)
 
         print(f"Report generated successfully: {output_path}")
+
         return output_path
 
     def generate_report_from_bytes(self, pdf_content: bytes, filename: str, output_path: str = None,
                                    report_title: str = None) -> str:
-        """
-        Complete workflow to generate a bibliometric report from PDF bytes
-
-        Args:
-            pdf_content (bytes): PDF file content as bytes
-            filename (str): Original filename
-            output_path (str): Path to save HTML report
-            report_title (str): Custom title for the report
-
-        Returns:
-            str: Path to generated HTML report
-        """
         print("Extracting text from uploaded document...")
+
         document_text = self.extract_text_from_pdf_bytes(pdf_content)
 
         if not document_text:
@@ -363,14 +281,12 @@ class BibliometricReportGenerator:
 
         if not analysis_data:
             raise ValueError("Could not analyze document")
-
         print("Generating HTML report...")
         if not report_title:
             report_title = f"Analysis of {filename.replace('.pdf', '')}"
 
-        html_content = self.generate_report_html(analysis_data, report_title)
 
-        # Save report
+        html_content = self.generate_report_html(analysis_data, report_title)
         if not output_path:
             output_path = f"{filename.replace('.pdf', '')}_report.html"
 
