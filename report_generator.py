@@ -26,7 +26,7 @@ class BibliometricReportGenerator:
     A class to generate bibliometric reports from academic papers using Gemini 2.5 Flash
     """
 
-    def __init__(self, api_key: str = "AIzaSyD3R_-41HkKljnZgeI0_QXz5bdymMMsBbs"):
+    def __init__(self, api_key: str = "AIzaSyCku-n4uQTCqpaoRHCjTRulWO_NOQ5Uz1o"):
         """
         Initialize the report generator with Gemini API key
 
