@@ -44,7 +44,7 @@ except ImportError as e:
 class RAGPipeline:
     """Complete RAG Pipeline with conversational memory."""
 
-    def __init__(self, gemini_api_key: str = "AIzaSyD3R_-41HkKljnZgeI0_QXz5bdymMMsBbs"):
+    def __init__(self, gemini_api_key: str = "AIzaSyCku-n4uQTCqpaoRHCjTRulWO_NOQ5Uz1o"):
         """
         Initialize the RAG pipeline.
 
